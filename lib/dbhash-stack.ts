@@ -1,10 +1,7 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as dyndb from 'aws-cdk-lib/aws-dynamodb';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as cr from 'aws-cdk-lib/custom-resources';
-import * as iam from 'aws-cdk-lib/aws-iam';
-import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { faker } from '@faker-js/faker';
 
 interface IPerson {
