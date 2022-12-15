@@ -98,8 +98,143 @@ However, Partition Overloading coupled with a Reverse Index GSI, where the Table
 
 As a result of the Table Partition Key being prefixed, the GSI Sort Key is prefixed, therefore making a GSI Overloading Pattern, with Reverse Index GSI and Partition Overloading, all together forms the pattern **Hash Sort Overloading**
 
-## Deploy DynamoDB Hash Sort Overloading Demo
+--- 
+---
+
+## Building a DynamoDB Hash Sort Overloading Schema
+
+At its most basic the DynamoDB schema is very simple, the Primary key is a Composite Key with the Partition Key name of `pk` and a type of `STRING`, and the Sort Key name of `sk` and a type of `STRING` 
+
+```TypeScript
+const table = new dyndb.Table(this, "dbHashSortTable", {
+    tableName: "dbHashTable",
+    partitionKey: { name: "pk", type: dyndb.AttributeType.STRING},
+    sortKey: { name: "sk", type: dyndb.AttributeType.STRING},
+    removalPolicy: cdk.RemovalPolicy.DESTROY
+})
+```
+Together the `pk` and `sk` being of type `STRING` allows for **Partition Key Prefixing** and **Sort Key Overloading**.
+
+Additionally create and add a Global Secondary Index (GSI) as a **Revese Index** of the Table Index, where the GSI Partition Key is the Table Sort Key `sk`, and the GSI Sort Key is the Table Partition Key `pk`. 
+
+```TypeScript
+const globalSecondaryIndexProps: dyndb.GlobalSecondaryIndexProps = {
+    indexName: 'reverse-index',
+    partitionKey: {
+    name: 'sk',
+    type: dyndb.AttributeType.STRING,
+    },
+    sortKey: {
+    name: 'pk',
+    type: dyndb.AttributeType.STRING,
+    }
+};
+
+table.addGlobalSecondaryIndex(globalSecondaryIndexProps);
+```
+### Populate Table with Test Data
+
+As there is no Data Schema on a DynamoDB struction, with the Primary Key set as a Composite Key of `pk` & `sk`. The only Attributes that must be provided for an Item are `pk` and `sk`, all other attributes for the item are optional.
+
+In order to create a relational structure, and populate with test data, create a series of interfaces to represnt the schema of the Table data from the application perspective.
+
+```TypeScript
+interface IPerson {
+  pk: { S: string };
+  sk: { S: string };//age
+  firstName: { S: string };
+  lastName: { S: string };
+  gender: { S: string };
+}
+
+interface IAddress {
+  pk: { S: string };
+  sk: { S: string };//state
+  city: { S: string };
+  street: { S: string };
+  postcode: { S: string }; 
+}
+
+interface IAccount {
+  pk: { S: string };
+  sk: { S: string };//role
+  username: { S: string };
+  password: { S: string };
+  email: { S: string };
+}
+```
+In this examples each of the attributes is of type string, event the sort key for age, as it will be prefixed with a sort string.
+
+using the faker-JS library (safe version ^7.5) crate a function for each entity interface to generate a random value for each attribute
+
+```TypeScript
+private generatePersonItem = (): IPerson => {
+    return {
+      pk: { S: `userId#${faker.datatype.uuid()}` },
+      sk: { S: `age#${faker.datatype.number({ max: 50, min: 18, precision: 0.1 })}`},
+      firstName: { S: faker.name.firstName() },
+      lastName: { S: faker.name.lastName() },
+      gender: { S: faker.name.gender() },
+    };
+};
+```
+
+In order to generate a batch of entities (so as not to just insert one of each entity), create a function to iterate and create an array of entities with the PK for each iteration of the array as the relationship between entities.
+
+```TypeScript
+private generateBatch = (batchSize = 25): { 
+    Person: { PutRequest: { Item: IPerson } }[], 
+    Address: { PutRequest: { Item: IAddress } }[],
+    Account: { PutRequest: { Item: IAccount } }[] 
+  } => {
+    let arr = new Array(batchSize).fill(undefined).map(() => {
+      return { PutRequest: { Item: this.generatePersonItem() } }
+    });
+    return {
+      Person: arr,
+      Address: arr.map((el) => {return {PutRequest: { Item: this.generateAddressItem(el.PutRequest.Item.pk.S)}}}),
+      Account: arr.map((el) => {return {PutRequest: { Item: this.generateAccountItem(el.PutRequest.Item.pk.S)}}})
+    }
+  };
+```
+
+Finally we call the generate batch function to create the array of entities, and use a CDK AWS Custom Resource to batch write the items to the DynamoDB table once the Table deployment and GSI creation is complete.
+
+```TypeScript
+let batch = this.generateBatch();
+new cr.AwsCustomResource(this, `initDBPersonBatch`, {
+    onCreate: {
+    service: 'DynamoDB',
+    action: 'batchWriteItem',
+    parameters: {
+        RequestItems: {
+        [table.tableName]: batch.Person
+        },
+    },
+    physicalResourceId: cr.PhysicalResourceId.of(`initDBDataBatch1`),
+    },
+    policy: cr.AwsCustomResourcePolicy.fromSdkCalls({ resources: [table.tableArn] }),
+});
+```
+
+### Deploy 
 
 * `npm run build`   compile typescript to js
-* `cdk deploy`      deploy this stack to your default AWS account/region
+* `cdk deploy`      deploy the stack to your default AWS account/region
 
+### Test
+
+Once the Table is deployed and populated with data, you can then run a query for all records of a specfic user:
+
+![user query](img/user_query.png)
+![user query](img/user_query_result.png)
+
+and search for all users of a specific record type but cunducting a query on the reverse-index:
+
+![user query](img/reverse_query.png)
+![user query](img/reverse_query_result.png)
+
+## Clean Up
+* `cdk destroy`     roll back and remove the CDK app stack.
+
+The removal policy on the CDK DynamoDB table is Destroy, so running the destroy command will allow the DynamoDB to be deleted, even though it is populated with data.
