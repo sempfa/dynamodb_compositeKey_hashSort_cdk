@@ -32,8 +32,8 @@ export class DbhashStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    const table = new dyndb.Table(this, "dbHashTableCDK", {
-      tableName: "dbHashTableCDK",
+    const table = new dyndb.Table(this, "dbHashSortTable", {
+      tableName: "dbHashSortTable",
       partitionKey: { name: "pk", type: dyndb.AttributeType.STRING},
       sortKey: { name: "sk", type: dyndb.AttributeType.STRING},
       removalPolicy: cdk.RemovalPolicy.DESTROY

@@ -101,16 +101,16 @@ As a result of the Table Partition Key being prefixed, the GSI Sort Key is prefi
 --- 
 ---
 
-## Building a DynamoDB Hash Sort Overloading Schema
+## Building a DynamoDB Hash Sort Overloading Schema in CDK
 
 At its most basic the DynamoDB schema is very simple, the Primary key is a Composite Key with the Partition Key name of `pk` and a type of `STRING`, and the Sort Key name of `sk` and a type of `STRING` 
 
 ```TypeScript
 const table = new dyndb.Table(this, "dbHashSortTable", {
-    tableName: "dbHashTable",
-    partitionKey: { name: "pk", type: dyndb.AttributeType.STRING},
-    sortKey: { name: "sk", type: dyndb.AttributeType.STRING},
-    removalPolicy: cdk.RemovalPolicy.DESTROY
+  tableName: "dbHashTable",
+  partitionKey: { name: "pk", type: dyndb.AttributeType.STRING},
+  sortKey: { name: "sk", type: dyndb.AttributeType.STRING},
+  removalPolicy: cdk.RemovalPolicy.DESTROY
 })
 ```
 Together the `pk` and `sk` being of type `STRING` allows for **Partition Key Prefixing** and **Sort Key Overloading**.
@@ -119,15 +119,15 @@ Additionally create and add a Global Secondary Index (GSI) as a **Revese Index**
 
 ```TypeScript
 const globalSecondaryIndexProps: dyndb.GlobalSecondaryIndexProps = {
-    indexName: 'reverse-index',
-    partitionKey: {
+  indexName: 'reverse-index',
+  partitionKey: {
     name: 'sk',
     type: dyndb.AttributeType.STRING,
-    },
-    sortKey: {
+  },
+  sortKey: {
     name: 'pk',
     type: dyndb.AttributeType.STRING,
-    }
+  }
 };
 
 table.addGlobalSecondaryIndex(globalSecondaryIndexProps);
@@ -169,13 +169,13 @@ using the faker-JS library (safe version ^7.5) crate a function for each entity 
 
 ```TypeScript
 private generatePersonItem = (): IPerson => {
-    return {
-      pk: { S: `userId#${faker.datatype.uuid()}` },
-      sk: { S: `age#${faker.datatype.number({ max: 50, min: 18, precision: 0.1 })}`},
-      firstName: { S: faker.name.firstName() },
-      lastName: { S: faker.name.lastName() },
-      gender: { S: faker.name.gender() },
-    };
+  return {
+    pk: { S: `userId#${faker.datatype.uuid()}` },
+    sk: { S: `age#${faker.datatype.number({ max: 50, min: 18, precision: 0.1 })}`},
+    firstName: { S: faker.name.firstName() },
+    lastName: { S: faker.name.lastName() },
+    gender: { S: faker.name.gender() },
+  };
 };
 ```
 
@@ -203,17 +203,17 @@ Finally we call the generate batch function to create the array of entities, and
 ```TypeScript
 let batch = this.generateBatch();
 new cr.AwsCustomResource(this, `initDBPersonBatch`, {
-    onCreate: {
+  onCreate: {
     service: 'DynamoDB',
     action: 'batchWriteItem',
     parameters: {
-        RequestItems: {
+      RequestItems: {
         [table.tableName]: batch.Person
-        },
+      },
     },
     physicalResourceId: cr.PhysicalResourceId.of(`initDBDataBatch1`),
-    },
-    policy: cr.AwsCustomResourcePolicy.fromSdkCalls({ resources: [table.tableArn] }),
+  },
+  policy: cr.AwsCustomResourcePolicy.fromSdkCalls({ resources: [table.tableArn] }),
 });
 ```
 
