@@ -238,3 +238,7 @@ and search for all users of a specific record type but cunducting a query on the
 * `cdk destroy`     roll back and remove the CDK app stack.
 
 The removal policy on the CDK DynamoDB table is Destroy, so running the destroy command will allow the DynamoDB to be deleted, even though it is populated with data.
+
+## LICENSE
+Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+SPDX-License-Identifier: MIT-0
